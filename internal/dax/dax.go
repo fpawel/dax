@@ -114,7 +114,7 @@ func ReadFirmware(log *structlog.Logger, responseReader modbus.ResponseReader,
 
 var (
 	FirmwareAddresses = []struct{ addr1, addr2 uint16 }{
-		{0, 0x37},
+		{0, 0x3B},
 		{0x600, 0x609 + 2},
 	}
 )

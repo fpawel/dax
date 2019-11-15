@@ -49,6 +49,7 @@ func main() {
 		if err != nil {
 			log.PrintErr(err)
 		}
+		conf.Product.PutFirmwareBytes(conf.Product.ToFirmwareBytes())
 	}
 
 	saveConf()
@@ -64,18 +65,11 @@ func main() {
 		TimeoutGetResponse: time.Second,
 		MaxAttemptsRead:    3,
 	})
+	comm.SetEnableLog(true)
 
 	action := flag.String("a", "", `что нужно сделать: 
  - read : считать память микросхемы датчика 
- - write : записать память микросхемы датчика
- - fon_minus20 - фоновый ток Iф при -20°С, нА
- - fon0 - считать фоновый ток Iф при 0°С, нА
- - fon20 - считать фоновый ток Iф при +20°С, нА"
- - fon50 - считать фоновый ток Iф при +50°С, нА
- - sens_minus20 - считать ток ПГС3 Iч при -20°С, нА
- - sens0 - считать фоновый ток ПГС3 Iч при 0°С, нА
- - sens20 - считать фоновый ток ПГС3 Iч при +20°С, нА
- - sens50 считать фоновый ток ПГС3 Iч при +50°С, нА`)
+ - write : записать память микросхемы датчика`)
 
 	place := flag.Int("place", 1, "номер места в плате стенда, к которому подключен датчик ДАХ")
 
@@ -84,17 +78,6 @@ func main() {
 	log = logPrependSuffixKeys(log, "action", *action, "place", *place)
 
 	defer saveConf()
-
-	readValue := func(p *float64) {
-		Var := (*place - 1) * 2
-		log.Info("считывание параметра", "var", Var)
-		value, err := modbus.Read3BCD(log, comPortReader, conf.Addr, modbus.Var(Var))
-		if err != nil {
-			log.PrintErr(err)
-			return
-		}
-		*p = value
-	}
 
 	switch *action {
 
@@ -110,23 +93,6 @@ func main() {
 			return
 		}
 		conf.Product.PutFirmwareBytes(b)
-
-	case "fon_minus20":
-		readValue(&conf.Product.FonMinus20)
-	case "fon0":
-		readValue(&conf.Product.Fon0)
-	case "fon20":
-		readValue(&conf.Product.Fon20)
-	case "fon50":
-		readValue(&conf.Product.Fon50)
-	case "sens_minus20":
-		readValue(&conf.Product.SensMinus20)
-	case "sens0":
-		readValue(&conf.Product.Sens0)
-	case "sens20":
-		readValue(&conf.Product.Sens20)
-	case "sens50":
-		readValue(&conf.Product.Sens50)
 
 	default:
 		log.PrintErr(fmt.Sprintf("не правильный параметр: -a=%q", *action))
