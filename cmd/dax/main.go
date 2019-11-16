@@ -8,11 +8,6 @@ import (
 )
 
 func main() {
-	InitLog()
-	app.Main()
-}
-
-func InitLog() {
 	structlog.DefaultLogger.
 		SetPrefixKeys(
 			structlog.KeyApp, structlog.KeyPID, structlog.KeyLevel, structlog.KeyUnit, structlog.KeyTime,
@@ -30,4 +25,6 @@ func InitLog() {
 			structlog.KeySource: " %6[2]s",
 			structlog.KeyUnit:   " %6[2]s",
 		})
+
+	app.Main()
 }

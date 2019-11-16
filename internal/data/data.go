@@ -37,9 +37,10 @@ type PartyInfo struct {
 }
 
 type Product struct {
-	ProductID int64 `db:"product_id"`
-	PartyID   int64 `db:"party_id"`
-	Place     int   `db:"place"`
+	CreatedAt time.Time `db:"created_at" yaml:"created_at"`
+	ProductID int64     `db:"product_id" yaml:"product_id"`
+	PartyID   int64     `db:"party_id" yaml:"party_id"`
+	Place     int       `db:"place" yaml:"place"`
 	dax.Product
 }
 
@@ -87,7 +88,7 @@ func GetCurrentPartyID(db *sqlx.DB) (int64, error) {
 	if err != sql.ErrNoRows {
 		return 0, err
 	}
-	if err := CreateNewParty(db); err != nil {
+	if err := CreateNewParty(db, 240); err != nil {
 		return 0, err
 	}
 	err = db.Get(&partyID, `SELECT party_id FROM last_party`)
@@ -102,8 +103,9 @@ func GetCurrentParty(db *sqlx.DB) (Party, error) {
 	return GetParty(db, partyID)
 }
 
-func CreateNewParty(db *sqlx.DB) error {
-	r, err := db.Exec(`INSERT INTO party (created_at) VALUES (?)`, time.Now())
+func CreateNewParty(db *sqlx.DB, productType int) error {
+	t := time.Now()
+	r, err := db.Exec(`INSERT INTO party (created_at) VALUES (?)`, t)
 	if err != nil {
 		return err
 	}
@@ -118,9 +120,10 @@ func CreateNewParty(db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
+	quarter := int(t.Month())/3 + 1
 	for i := 0; i < 10; i++ {
-		if r, err = db.Exec(`INSERT INTO product(party_id, place) VALUES (?, ?);`,
-			newPartyID, i+1); err != nil {
+		if r, err = db.Exec(`INSERT INTO product(party_id, place, year, quarter, product_type) VALUES (?, ?, ?, ?, ?);`,
+			newPartyID, i+1, t.Year(), quarter, productType); err != nil {
 			return err
 		}
 		if _, err = getNewInsertedID(r); err != nil {
@@ -143,7 +146,11 @@ func GetParty(db *sqlx.DB, partyID int64) (Party, error) {
 }
 
 func ListProducts(db *sqlx.DB, partyID int64) (products []Product, err error) {
-	err = db.Select(&products, `SELECT * FROM product WHERE party_id=? ORDER BY product_id`, partyID)
+	err = db.Select(&products, `
+SELECT product.*, created_at FROM product
+INNER JOIN party USING (party_id)
+WHERE party_id=? 
+ORDER BY product_id`, partyID)
 	return
 }
 
