@@ -13,7 +13,7 @@ type ChipType byte
 
 const (
 	Chip16 ChipType = iota
-	_
+	Chip64
 	Chip256
 )
 

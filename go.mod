@@ -6,7 +6,7 @@ require (
 	github.com/ansel1/merry v1.5.0
 	github.com/fpawel/comm v0.0.0-20191031131148-81f4523d4a3a
 	github.com/fpawel/gohelp v0.0.0-20190924173037-13a662474c66
-	github.com/fpawel/gotools v0.0.0-20191030125146-1d6c7465834c // indirect
+	github.com/fpawel/gotools v0.0.0-20191030125146-1d6c7465834c
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lxn/walk v0.0.0-20191113135339-bf589de20b3c
 	github.com/lxn/win v0.0.0-20191106123917-121afc750dd3

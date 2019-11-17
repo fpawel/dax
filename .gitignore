@@ -6,7 +6,6 @@ __recovery/
 .vscode/
 .idea/
 build/
-!build/assets/
 *.exe
 *.qtpl.go
 internal/api/notify/api_generated.go

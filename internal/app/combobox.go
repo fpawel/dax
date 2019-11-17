@@ -30,14 +30,41 @@ var (
 			AssignTo:     &cb,
 			MaxSize:      Size{100, 0},
 			Model:        getComports(),
-			CurrentIndex: comportIndex(setsComportName()),
+			CurrentIndex: comportIndex(config.Comport),
 			OnMouseDown: func(_, _ int, _ walk.MouseButton) {
 				n := cb.CurrentIndex()
 				_ = cb.SetModel(getComports())
 				_ = cb.SetCurrentIndex(n)
 			},
 			OnCurrentIndexChanged: func() {
-				panicIf(sets.Put("comport", cb.Text()))
+				config.Comport = cb.Text()
+			},
+		}
+	}()
+
+	ComboBoxChip = func() ComboBox {
+
+		var cb *walk.ComboBox
+
+		model := []string{"24LC16", "24LC64", "24W256"}
+
+		getIdx := func(x string) int {
+			for i, s := range model {
+				if s == x {
+					return i
+				}
+			}
+			return -1
+		}
+
+		return ComboBox{
+			AssignTo:     &cb,
+			MaxSize:      Size{100, 0},
+			Model:        model,
+			CurrentIndex: getIdx(config.Chip),
+			OnCurrentIndexChanged: func() {
+				config.Chip = cb.Text()
+				config.Chip = cb.Text()
 			},
 		}
 	}()

@@ -1,5 +1,3 @@
-//todo настройки приёмопередачи - редактировать и сохранять в файде настроек приложения
-//todo добавит комбобок с выбором типа микросхемы
 //todo ограничить высоту таблицы
 //todo считывание параметров ДАХ из показаний и сохранение в БД
 
@@ -24,34 +22,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"sync"
 	"time"
 )
 
 var (
-	log          = structlog.New()
-	mainWnd      *walk.MainWindow
-	prodsVm      *prodsTblVm
-	db           *sqlx.DB
-	tmpDir       = filepath.Join(filepath.Dir(os.Args[0]), "tmp")
-	gbPartyTitle *walk.GroupBox
+	log           = structlog.New()
+	mainWnd       *walk.MainWindow
+	prodsVm       *prodsTblVm
+	db            *sqlx.DB
+	tmpDir        = filepath.Join(filepath.Dir(os.Args[0]), "tmp")
+	gbPartyTitle  *walk.GroupBox
+	comportReader modbus.ResponseReader
 )
 
 func Main() {
+	defer saveConfig()
+	defer cleanTmpDir()
 
-	log.Debug(sets.FilePath())
-
-	defer func() {
-		panicIf(sets.Save())
-	}()
+	initLog()
+	openConfig()
 
 	cleanTmpDir()
 	if err := os.MkdirAll(tmpDir, os.ModePerm); err != nil {
 		log.PrintErr(merry.Append(err, "os.RemoveAll(tmpDir)"))
 	}
-	defer cleanTmpDir()
 
 	dbFilename := filepath.Join(filepath.Dir(os.Args[0]), "dax.sqlite")
 	log.Debug("open database: " + dbFilename)
@@ -95,18 +90,18 @@ func Main() {
 		setStatus(s, walk.RGB(0, 0, 0))
 	}
 
-	withComportReader := func(workName string, work func(modbus.ResponseReader, context.Context) error) {
+	withComportReader := func(workName string, work func() error) {
 		comPort := comport.NewPort(comport.Config{
 			Baud:        115200,
 			ReadTimeout: time.Millisecond,
-			Name:        setsComportName(),
+			Name:        config.Comport,
 		})
 		if err := comPort.Open(); err != nil {
 			setStatusError(merry.Append(err, workName))
 			return
 		}
 
-		setStatusOk(fmt.Sprintf("%s: %s: выполняется", workName, setsComportName()))
+		setStatusOk(fmt.Sprintf("%s: %s: выполняется", workName, config.Comport))
 		panicIf(pbRunInterrogate.SetText("Стоп"))
 
 		wgInterrogate.Add(1)
@@ -114,18 +109,19 @@ func Main() {
 		var ctx context.Context
 		ctx, interruptInterrogate = context.WithCancel(context.Background())
 
-		comPortReader := comPort.NewResponseReader(ctx, comm.Config{
-			TimeoutEndResponse: 50 * time.Millisecond,
-			TimeoutGetResponse: time.Second,
-			MaxAttemptsRead:    3,
+		comportReader = comPort.NewResponseReader(ctx, comm.Config{
+			TimeoutEndResponse: config.TimeoutEndResponse,
+			TimeoutGetResponse: config.TimeoutGetResponse,
+			MaxAttemptsRead:    config.MaxAttemptsRead,
+			Pause:              config.Pause,
 		})
 
 		go func() {
-			err := work(comPortReader, ctx)
+			err := work()
 			wgInterrogate.Done()
 			log.ErrIfFail(comPort.Close)
 			mainWnd.Synchronize(func() {
-				panicIf(pbRunInterrogate.SetText("Старт"))
+				panicIf(pbRunInterrogate.SetText("Опрос"))
 				if err != nil {
 					setStatusError(merry.New(workName).WithCause(err))
 				} else {
@@ -135,46 +131,35 @@ func Main() {
 		}()
 	}
 
+	var menuReadParam []MenuItem
+
+	for _, x := range readParams {
+		x := x
+		menuReadParam = append(menuReadParam, Action{
+			Text: x.S,
+			OnTriggered: func() {
+				withComportReader(x.S, func() error {
+					return readParam(x.S, x.F)
+				})
+
+			},
+		})
+	}
+
 	runWindowMaximized(MainWindow{
 		Title:    "Настройка ДАХ-М",
-		MinSize:  Size{600, 400},
 		Font:     Font{Family: "Arial", PointSize: 9},
 		AssignTo: &mainWnd,
-
 		MenuItems: []MenuItem{
-			Menu{
-				Text: "Загрузка",
-				Items: []MenuItem{
-					Action{
-						Text: "Создать новую",
-						OnTriggered: func() {
-							_, err := newPartyDialog.Run(mainWnd)
-							panicIf(err)
-						},
-					},
-					Action{
-						Text:        "Конфигурация",
-						OnTriggered: runEditPartyConfig,
-					},
-					Action{
-						Text: "Архив",
-						OnTriggered: func() {
-							mainWnd.SetVisible(false)
-							runWindowMaximized(MainWindow{
-								Title:  "Архив ДАХ",
-								Font:   Font{Family: "Arial", PointSize: 9},
-								Layout: Grid{},
-								Children: []Widget{
-									TableView{
-										Model:   newArchProdsTblVm(),
-										Columns: archProdCols1,
-									},
-								},
-							})
-
-							mainWnd.SetVisible(true)
-						},
-					},
+			Action{
+				Text:        "Конфигурация",
+				OnTriggered: runEditPartyConfig,
+			},
+			Action{
+				Text: "Новая партия",
+				OnTriggered: func() {
+					_, err := newPartyDialog.Run(mainWnd)
+					panicIf(err)
 				},
 			},
 			Menu{
@@ -195,36 +180,33 @@ func Main() {
 				},
 			},
 			Menu{
-				Text: "Считать параметр",
-				Items: []MenuItem{
-					Action{
-						Text: "фоновый ток при -20°С",
-					},
-					Action{
-						Text: "фоновый ток при 0°С",
-					},
-					Action{
-						Text: "фоновый ток при +20°С",
-					},
-					Action{
-						Text: "фоновый ток при +50°С",
-					},
-					Action{
-						Text: "чувствительность при -20°С",
-					},
-					Action{
-						Text: "чувствительность при 0°С",
-					},
-					Action{
-						Text: "чувствительность при +20°С",
-					},
-					Action{
-						Text: "чувствительность при +50°С",
-					},
+				Text:  "Считать параметр",
+				Items: menuReadParam,
+			},
+			Action{
+				Text: "Архив",
+				OnTriggered: func() {
+					mainWnd.SetVisible(false)
+					runWindowMaximized(MainWindow{
+						Title:  "Архив ДАХ",
+						Font:   Font{Family: "Arial", PointSize: 9},
+						Layout: Grid{},
+						Children: []Widget{
+							TableView{
+								Model:   newArchProdsTblVm(),
+								Columns: archProdCols1,
+							},
+						},
+					})
+
+					mainWnd.SetVisible(true)
 				},
 			},
 		},
-		Layout: VBox{},
+		Layout:  VBox{},
+		MaxSize: Size{0, 380},
+		MinSize: Size{0, 380},
+		Size:    Size{0, 380},
 		Children: []Widget{
 			ScrollView{
 				VerticalFixed: true,
@@ -232,9 +214,11 @@ func Main() {
 				Children: []Widget{
 					TextLabel{Text: "СОМ порт", MaxSize: Size{80, 0}},
 					ComboBoxComport,
+					TextLabel{Text: "Чип", MaxSize: Size{40, 0}},
+					ComboBoxChip,
 					PushButton{
 						AssignTo: &pbRunInterrogate,
-						Text:     "Старт",
+						Text:     "Опрос",
 
 						OnClicked: func() {
 							if pbRunInterrogate.Text() == "Стоп" {
@@ -250,6 +234,8 @@ func Main() {
 			},
 			GroupBox{
 				AssignTo: &gbPartyTitle,
+				MaxSize:  Size{0, 280},
+				MinSize:  Size{0, 280},
 				Title:    fmt.Sprintf("Текущая загрузка: №%d %s", party.PartyID, party.CreatedAt.Format("02.01.06 15:04")),
 				Layout:   Grid{},
 				Children: []Widget{
@@ -265,8 +251,10 @@ func Main() {
 					},
 				},
 			},
+			TableView{},
 		},
 	})
+	panicIf(err)
 }
 
 func uploadLastParty() {
@@ -287,13 +275,33 @@ func setProductErr(x *prodsTblVmProduct, err error) {
 	mainWnd.Synchronize(prodsVm.PublishRowsReset)
 }
 
-func readFirmware(reader modbus.ResponseReader, _ context.Context) error {
+func readParam(workName string, f func(*prodsTblVmProduct) *float64) error {
+
+	defer mainWnd.Synchronize(uploadLastParty)
+
+	xs, err := modbus.Read3BCDs(log, comportReader, config.Addr, 0, 10)
+	if err == context.Canceled {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for i := range prodsVm.xs {
+		x := &prodsVm.xs[i]
+		*f(x) = xs[i]
+		setProductOk(x, fmt.Sprintf("%v: %s", xs[i], workName))
+		panicIf(data.UpdateProduct(db, x.Product))
+	}
+	return nil
+}
+
+func readFirmware() error {
 	for i := range prodsVm.xs {
 
 		x := &prodsVm.xs[i]
 		setProductOk(x, "считывание...")
 
-		b, err := dax.ReadFirmware(log, reader, 101, i+1, dax.Chip256)
+		b, err := dax.ReadFirmware(log, comportReader, config.Addr, i+1, parseChipType(config.Chip))
 		if err == nil {
 			x.Product.PutFirmwareBytes(b)
 			setProductOk(x, "считано")
@@ -308,14 +316,14 @@ func readFirmware(reader modbus.ResponseReader, _ context.Context) error {
 	return nil
 }
 
-func writeFirmware(reader modbus.ResponseReader, _ context.Context) error {
+func writeFirmware() error {
 	for i := range prodsVm.xs {
 
 		x := &prodsVm.xs[i]
 
 		setProductOk(x, "запись...")
 
-		err := dax.WriteFirmware(log, reader, 101, i+1, dax.Chip256, x.Product.ToFirmwareBytes())
+		err := dax.WriteFirmware(log, comportReader, config.Addr, i+1, parseChipType(config.Chip), x.Product.ToFirmwareBytes())
 		if err == nil {
 			setProductOk(x, "записано")
 			continue
@@ -329,9 +337,9 @@ func writeFirmware(reader modbus.ResponseReader, _ context.Context) error {
 	return nil
 }
 
-func interrogate(reader modbus.ResponseReader, ctx context.Context) error {
+func interrogate() error {
 	for {
-		xs, err := modbus.Read3BCDs(log, reader, 101, 0, 10)
+		xs, err := modbus.Read3BCDs(log, comportReader, config.Addr, 0, 10)
 		if err == context.Canceled {
 			return nil
 		}
@@ -359,10 +367,23 @@ func runWindowMaximized(aw MainWindow) {
 }
 
 func runEditPartyConfig() {
-	b, err := yaml.Marshal(prodsVm.xs)
+
+	type appConfig struct {
+		App      Config         `yaml:"app"`
+		Products []data.Product `yaml:"products"`
+	}
+
+	var c appConfig
+	c.App = config
+
+	for _, p := range prodsVm.xs {
+		c.Products = append(c.Products, p.Product)
+	}
+
+	b, err := yaml.Marshal(c)
 	panicIf(err)
 
-	filename := filepath.Join(tmpDir, fmt.Sprintf("products%d.yaml", prodsVm.xs[0].PartyID))
+	filename := filepath.Join(tmpDir, "app-config.yaml")
 
 	panicIf(ioutil.WriteFile(filename, b, 0644))
 	cmd := exec.Command("./npp/notepad++.exe", filename)
@@ -373,12 +394,17 @@ func runEditPartyConfig() {
 		panicIf(cmd.Wait())
 		b, err = ioutil.ReadFile(filename)
 		panicIf(err)
-		if err := yaml.Unmarshal(b, &prodsVm.xs); err != nil {
+		if err := yaml.Unmarshal(b, &c); err != nil {
 			showConfigErr(err)
 			return
 		}
-		for _, p := range prodsVm.xs {
-			if err := data.UpdateProduct(db, p.Product); err != nil {
+
+		config = c.App
+		comm.SetEnableLog(config.LogComm)
+
+		for i, p := range c.Products {
+			prodsVm.xs[i].Product = p
+			if err := data.UpdateProduct(db, p); err != nil {
 				showConfigErr(err)
 				return
 			}
@@ -413,62 +439,6 @@ func runEditProductConfig(p data.Product) {
 	}()
 }
 
-func showArchive(db *sqlx.DB) {
-	var xs []data.Product
-	panicIf(db.Select(&xs, `
-SELECT created_at, product.* FROM product
-INNER JOIN party USING (party_id)
-ORDER BY created_at DESC, place`))
-
-	filename := filepath.Join(tmpDir, "архив.txt")
-	file, err := os.Create(filename)
-	panicIf(err)
-	writeStr := func(s string) {
-		_, err := file.WriteString(s)
-		panicIf(err)
-	}
-	writeStr(strings.Join([]string{
-		"product_id",
-		"product_type",
-		"serial1",
-		"serial2",
-		"serial3",
-		"year",
-		"quarter",
-		"place",
-		"fon_minus20",
-		"fon0",
-		"fon_minus20",
-		"fon0",
-		"fon20",
-		"fon50",
-		"sens_minus20",
-		"sens0",
-		"sens20",
-		"sens50",
-		"temp_minus20",
-		"temp0",
-		"party_id",
-		"created_at",
-	}, "\t") + "\n")
-
-	typeProduct := reflect.TypeOf(data.Product{})
-	// Iterate over all available fields and read the tag value
-	for i := 0; i < typeProduct.NumField(); i++ {
-		writeStr(typeProduct.Field(i).Name + "\t")
-	}
-	writeStr("\n")
-	for _, x := range xs {
-		v := reflect.ValueOf(x)
-		for i := 0; i < typeProduct.NumField(); i++ {
-			writeStr(v.Field(i).String() + "\t")
-		}
-		writeStr("\n")
-	}
-	panicIf(file.Close())
-	panicIf(exec.Command("./npp/notepad++.exe", filename).Start())
-}
-
 var newPartyDialog = func() Dialog {
 	var (
 		ed  *walk.NumberEdit
@@ -500,4 +470,78 @@ func showConfigErr(err error) {
 	mainWnd.Synchronize(func() {
 		walk.MsgBox(mainWnd, "Ошибка ввода конфигурации", err.Error(), walk.MsgBoxIconError|walk.MsgBoxOK)
 	})
+}
+
+func initLog() {
+	structlog.DefaultLogger.
+		SetPrefixKeys(
+			structlog.KeyApp, structlog.KeyPID, structlog.KeyLevel, structlog.KeyUnit, structlog.KeyTime,
+		).
+		SetDefaultKeyvals(
+			structlog.KeyApp, filepath.Base(os.Args[0]),
+			structlog.KeySource, structlog.Auto,
+		).
+		SetSuffixKeys(
+			structlog.KeyStack,
+		).
+		SetSuffixKeys(structlog.KeySource).
+		SetKeysFormat(map[string]string{
+			structlog.KeyTime:   " %[2]s",
+			structlog.KeySource: " %6[2]s",
+			structlog.KeyUnit:   " %6[2]s",
+		})
+}
+
+var readParams = []struct {
+	S string
+	F func(*prodsTblVmProduct) *float64
+}{
+	{
+		"фоновый ток при -20°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.FonMinus20
+		},
+	},
+	{
+		"фоновый ток при 0°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Fon0
+		},
+	},
+	{
+		"фоновый ток при +20°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Fon20
+		},
+	},
+	{
+		"фоновый ток при +50°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Fon50
+		},
+	},
+	{
+		"чувствительность при -20°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.SensMinus20
+		},
+	},
+	{
+		"чувствительность при 0°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Sens0
+		},
+	},
+	{
+		"чувствительность при +20°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Sens20
+		},
+	},
+	{
+		"чувствительность при +50°С",
+		func(p *prodsTblVmProduct) *float64 {
+			return &p.Sens50
+		},
+	},
 }
