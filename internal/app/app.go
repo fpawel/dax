@@ -213,9 +213,7 @@ func Main() {
 				Layout:        HBox{},
 				Children: []Widget{
 					TextLabel{Text: "СОМ порт", MaxSize: Size{80, 0}},
-					ComboBoxComport,
-					TextLabel{Text: "Чип", MaxSize: Size{40, 0}},
-					ComboBoxChip,
+					ComboBoxComport(),
 					PushButton{
 						AssignTo: &pbRunInterrogate,
 						Text:     "Опрос",
@@ -340,7 +338,7 @@ func writeFirmware() error {
 func interrogate() error {
 	for {
 		xs, err := modbus.Read3BCDs(log, comportReader, config.Addr, 0, 10)
-		if err == context.Canceled {
+		if merry.Is(err, context.Canceled) {
 			return nil
 		}
 		if err != nil {

@@ -28,7 +28,7 @@ var (
 		Addr:               101,
 		LogComm:            false,
 		Chip:               "24W256",
-		TimeoutGetResponse: 700 * time.Millisecond,
+		TimeoutGetResponse: time.Second,
 		TimeoutEndResponse: 50 * time.Millisecond,
 	}
 )

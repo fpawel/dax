@@ -123,7 +123,7 @@ func CreateNewParty(db *sqlx.DB, productType int) error {
 	quarter := int(t.Month())/3 + 1
 	for i := 0; i < 10; i++ {
 		if r, err = db.Exec(`INSERT INTO product(party_id, place, year, quarter, product_type) VALUES (?, ?, ?, ?, ?);`,
-			newPartyID, i+1, t.Year(), quarter, productType); err != nil {
+			newPartyID, i+1, t.Year()-2000, quarter, productType); err != nil {
 			return err
 		}
 		if _, err = getNewInsertedID(r); err != nil {
