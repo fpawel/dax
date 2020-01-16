@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
+	"strconv"
 )
 
 func panicIf(err error) {
@@ -30,4 +31,8 @@ func mustMarshalYaml(v interface{}) []byte {
 func mustWriteFile(name string, buf []byte, perm os.FileMode) {
 	err := ioutil.WriteFile(name, buf, perm)
 	panicIf(err)
+}
+
+func formatFloat(v float64) string {
+	return strconv.FormatFloat(v, 'g', -1, 64)
 }

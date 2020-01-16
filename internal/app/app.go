@@ -33,7 +33,7 @@ var (
 	db            *sqlx.DB
 	tmpDir        = filepath.Join(filepath.Dir(os.Args[0]), "tmp")
 	gbPartyTitle  *walk.GroupBox
-	comportReader modbus.ResponseReader
+	comportReader comm.T
 )
 
 func Main() {
@@ -90,7 +90,7 @@ func Main() {
 		setStatus(s, walk.RGB(0, 0, 0))
 	}
 
-	withComportReader := func(workName string, work func() error) {
+	withComportReader := func(workName string, work func(ctx context.Context) error) {
 		comPort := comport.NewPort(comport.Config{
 			Baud:        115200,
 			ReadTimeout: time.Millisecond,
@@ -109,7 +109,7 @@ func Main() {
 		var ctx context.Context
 		ctx, interruptInterrogate = context.WithCancel(context.Background())
 
-		comportReader = comPort.NewResponseReader(ctx, comm.Config{
+		comportReader = comm.New(comPort, comm.Config{
 			TimeoutEndResponse: config.TimeoutEndResponse,
 			TimeoutGetResponse: config.TimeoutGetResponse,
 			MaxAttemptsRead:    config.MaxAttemptsRead,
@@ -117,7 +117,7 @@ func Main() {
 		})
 
 		go func() {
-			err := work()
+			err := work(ctx)
 			wgInterrogate.Done()
 			log.ErrIfFail(comPort.Close)
 			mainWnd.Synchronize(func() {
@@ -138,8 +138,8 @@ func Main() {
 		menuReadParam = append(menuReadParam, Action{
 			Text: x.S,
 			OnTriggered: func() {
-				withComportReader(x.S, func() error {
-					return readParam(x.S, x.F)
+				withComportReader(x.S, func(ctx context.Context) error {
+					return readParam(x.S, ctx, x.F)
 				})
 
 			},
@@ -273,11 +273,11 @@ func setProductErr(x *prodsTblVmProduct, err error) {
 	mainWnd.Synchronize(prodsVm.PublishRowsReset)
 }
 
-func readParam(workName string, f func(*prodsTblVmProduct) *float64) error {
+func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) *float64) error {
 
 	defer mainWnd.Synchronize(uploadLastParty)
 
-	xs, err := modbus.Read3BCDs(log, comportReader, config.Addr, 0, 10)
+	xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 0, 10, modbus.BCD)
 	if err == context.Canceled {
 		return nil
 	}
@@ -293,13 +293,13 @@ func readParam(workName string, f func(*prodsTblVmProduct) *float64) error {
 	return nil
 }
 
-func readFirmware() error {
+func readFirmware(ctx context.Context) error {
 	for i := range prodsVm.xs {
 
 		x := &prodsVm.xs[i]
 		setProductOk(x, "считывание...")
 
-		b, err := dax.ReadFirmware(log, comportReader, config.Addr, i+1, parseChipType(config.Chip))
+		b, err := dax.ReadFirmware(log, ctx, comportReader, config.Addr, i+1, parseChipType(config.Chip))
 		if err == nil {
 			x.Product.PutFirmwareBytes(b)
 			setProductOk(x, "считано")
@@ -314,14 +314,14 @@ func readFirmware() error {
 	return nil
 }
 
-func writeFirmware() error {
+func writeFirmware(ctx context.Context) error {
 	for i := range prodsVm.xs {
 
 		x := &prodsVm.xs[i]
 
 		setProductOk(x, "запись...")
 
-		err := dax.WriteFirmware(log, comportReader, config.Addr, i+1, parseChipType(config.Chip), x.Product.ToFirmwareBytes())
+		err := dax.WriteFirmware(log, ctx, comportReader, config.Addr, i+1, parseChipType(config.Chip), x.Product.ToFirmwareBytes())
 		if err == nil {
 			setProductOk(x, "записано")
 			continue
@@ -335,9 +335,9 @@ func writeFirmware() error {
 	return nil
 }
 
-func interrogate() error {
+func interrogate(ctx context.Context) error {
 	for {
-		xs, err := modbus.Read3BCDs(log, comportReader, config.Addr, 0, 10)
+		xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 0, 10, modbus.BCD)
 		if merry.Is(err, context.Canceled) {
 			return nil
 		}

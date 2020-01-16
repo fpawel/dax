@@ -154,73 +154,73 @@ var prodCols = func() []prodCol {
 		{
 			C: TableViewColumn{Name: "Фон -20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.FonMinus20
+				return formatFloat(p.FonMinus20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Фон 0°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Fon0
+				return formatFloat(p.Fon0)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Фон +20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Fon20
+				return formatFloat(p.Fon20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Фон +50°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Fon50
+				return formatFloat(p.Fon50)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Ч -20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.SensMinus20
+				return formatFloat(p.SensMinus20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Ч 0°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Sens0
+				return formatFloat(p.Sens0)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Ч +20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Sens20
+				return formatFloat(p.Sens20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Ч +50°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Sens50
+				return formatFloat(p.Sens50)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Т -20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.TempMinus20
+				return formatFloat(p.TempMinus20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Т 0°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Temp0
+				return formatFloat(p.Temp0)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Т +20°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Temp20
+				return formatFloat(p.Temp20)
 			},
 		},
 		{
 			C: TableViewColumn{Name: "Т +50°С"},
 			F: func(p prodsTblVmProduct) interface{} {
-				return p.Temp50
+				return formatFloat(p.Temp50)
 			},
 		},
 	}

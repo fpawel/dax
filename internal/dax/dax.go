@@ -1,6 +1,7 @@
 package dax
 
 import (
+	"context"
 	"fmt"
 	"github.com/ansel1/merry"
 	"github.com/fpawel/comm"
@@ -17,7 +18,7 @@ const (
 	Chip256
 )
 
-func WriteFirmware(log *structlog.Logger, responseReader modbus.ResponseReader,
+func WriteFirmware(log *structlog.Logger, ctx context.Context, cm comm.T,
 	addr modbus.Addr,
 	place int, chip ChipType, bytes []byte) error {
 	log = logPrependSuffixKeys(log,
@@ -44,22 +45,21 @@ func WriteFirmware(log *structlog.Logger, responseReader modbus.ResponseReader,
 				byte(len(data)),
 			}, data...),
 		}
-		if _, err := req.GetResponse(log, responseReader, func(_, response []byte) (s string, e error) {
-			if len(response) != 5 {
-				return "", comm.Err.Here().Append("длина ответа должна быть 5")
-			}
-			if response[2] != 0 {
-				return "", comm.Err.Here().Appendf("код ошибки %d", response[2])
-			}
-			return "", nil
-		}); err != nil {
-			return err
+		response, err := req.GetResponse(log, ctx, cm)
+		if err != nil {
+			return merry.Wrap(err)
+		}
+		if len(response) != 5 {
+			return merry.New("длина ответа должна быть 5")
+		}
+		if response[2] != 0 {
+			return merry.Errorf("код ошибки %d", response[2])
 		}
 	}
 	return nil
 }
 
-func ReadFirmware(log *structlog.Logger, responseReader modbus.ResponseReader,
+func ReadFirmware(log *structlog.Logger, ctx context.Context, cm comm.T,
 	addr modbus.Addr,
 	place int, chip ChipType) ([]byte, error) {
 
@@ -97,17 +97,18 @@ func ReadFirmware(log *structlog.Logger, responseReader modbus.ResponseReader,
 			"bytes_count", count,
 		)
 
-		resp, err := req.GetResponse(log, responseReader, func(request, response []byte) (string, error) {
-			if len(response) != 10+int(count) {
-				return "", comm.Err.Here().Appendf("ожидалось %d байт ответа, получено %d",
-					10+int(count), len(response))
-			}
-			return "", nil
-		})
+		response, err := req.GetResponse(log, ctx, cm)
+
 		if err != nil {
 			return nil, merry.Wrap(err)
 		}
-		copy(b[c.addr1:c.addr1+count], resp[8:8+count])
+
+		if len(response) != 10+int(count) {
+			return nil, merry.Errorf("ожидалось %d байт ответа, получено %d",
+				10+int(count), len(response))
+		}
+
+		copy(b[c.addr1:c.addr1+count], response[8:8+count])
 	}
 	return b, nil
 }
