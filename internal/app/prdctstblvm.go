@@ -1,10 +1,12 @@
 package app
 
+import "C"
 import (
 	"fmt"
 	"github.com/fpawel/dax/internal/data"
 	"github.com/lxn/walk"
 	. "github.com/lxn/walk/declarative"
+	"strconv"
 )
 
 var _ walk.TableModel = new(prodsTblVm)
@@ -28,6 +30,16 @@ func (x *prodsTblVm) SetProducts(xs []data.Product) {
 	x.PublishRowsReset()
 }
 
+func (x *prodsTblVm) Checked(n int) bool {
+	return x.xs[n].Active
+}
+
+func (x *prodsTblVm) SetChecked(n int, checked bool) error {
+	x.xs[n].Active = checked
+	db.MustExec(`UPDATE product SET active = ? WHERE product_id = ?`, checked, x.xs[n].ProductID)
+	return nil
+}
+
 func (x *prodsTblVm) RowCount() int {
 	return 10
 }
@@ -40,8 +52,8 @@ func (x *prodsTblVm) StyleCell(s *walk.CellStyle) {
 	if s.Col() < 0 || s.Col() >= len(prodCols) {
 		return
 	}
-	col := prodCols[s.Col()]
-	if col.C.Name == "Опрос" && x.xs[s.Row()].ErrOccurred {
+	//col := prodCols[s.Col()]
+	if s.Col() == 2 && x.xs[s.Row()].ErrOccurred {
 		s.TextColor = walk.RGB(255, 0, 0)
 		s.BackgroundColor = walk.RGB(220, 220, 220)
 	}
@@ -75,23 +87,6 @@ func (x *archProdsTblVm) Value(row, col int) interface{} {
 	p := x.xs[row]
 	return archProdCols[col].F(p)
 }
-
-//var archProdCols = func() []prodCol{
-//	return append([]prodCol{
-//		{
-//			C: TableViewColumn{Name: "Дата", Width: 80, Format:"02.01.06 15:04"},
-//			F: func(p prodsTblVmProduct) interface{} {
-//				return p.CreatedAt
-//			},
-//		},
-//		{
-//			C: TableViewColumn{Name: "Загрузка", Width: 80},
-//			F: func(p prodsTblVmProduct) interface{} {
-//				return p.PartyID
-//			},
-//		},
-//	}, append(prodCols[0:2], prodCols[3:]...)...)
-//}()
 
 var archProdCols = func() []prodCol {
 	xs := []prodCol{
@@ -128,9 +123,19 @@ var prodCols = func() []prodCol {
 			},
 		},
 		{
-			C: TableViewColumn{Name: "Опрос"},
+			C: TableViewColumn{Name: "U,мВ"},
 			F: func(p prodsTblVmProduct) interface{} {
 				return p.Indication
+			},
+		},
+		{
+			C: TableViewColumn{Name: "I,мкА"},
+			F: func(p prodsTblVmProduct) interface{} {
+				v, err := strconv.ParseFloat(p.Indication, 64)
+				if err != nil {
+					return ""
+				}
+				return v / config.Rf
 			},
 		},
 		{

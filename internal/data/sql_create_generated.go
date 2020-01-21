@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS product
     serial2      SMALLINT            NOT NULL DEFAULT 0,
     serial3      SMALLINT            NOT NULL DEFAULT 0,
     product_type SMALLINT            NOT NULL DEFAULT 0,
+    active       BOOLEAN             NOT NULL DEFAULT (1),
     year         SMALLINT            NOT NULL DEFAULT 0,
     quarter      SMALLINT            NOT NULL DEFAULT 0,
     fon_minus20  REAL                NOT NULL DEFAULT 0,
@@ -40,7 +41,9 @@ CREATE TABLE IF NOT EXISTS product
     temp20       REAL                NOT NULL DEFAULT 0,
     temp50       REAL                NOT NULL DEFAULT 0,
     CHECK ( place BETWEEN 1 AND 10),
+    CHECK ( active IN (0, 1) ),
     UNIQUE (party_id, place),
-    FOREIGN KEY (party_id) REFERENCES party (party_id) ON DELETE CASCADE
+    FOREIGN KEY (party_id) REFERENCES party (party_id) ON DELETE
+        CASCADE
 );
 `

@@ -238,9 +238,10 @@ func Main() {
 				Layout:   Grid{},
 				Children: []Widget{
 					TableView{
-						AssignTo: &prodsTblView,
-						Model:    prodsVm,
-						Columns:  prodCols1,
+						AssignTo:   &prodsTblView,
+						Model:      prodsVm,
+						Columns:    prodCols1,
+						CheckBoxes: true,
 						OnItemActivated: func() {
 							if n := prodsTblView.CurrentIndex(); n >= 0 && n < len(prodsVm.xs) {
 								runEditProductConfig(prodsVm.xs[n].Product)
@@ -286,7 +287,9 @@ func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) 
 	}
 	for i := range prodsVm.xs {
 		x := &prodsVm.xs[i]
-		*f(x) = xs[i]
+
+		*f(x) = xs[i] * 1000. / config.Rf
+
 		setProductOk(x, fmt.Sprintf("%v: %s", xs[i], workName))
 		panicIf(data.UpdateProduct(db, x.Product))
 	}
@@ -337,7 +340,7 @@ func writeFirmware(ctx context.Context) error {
 
 func interrogate(ctx context.Context) error {
 	for {
-		xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 0, 10, modbus.BCD)
+		xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 6, 10, modbus.BCD)
 		if merry.Is(err, context.Canceled) {
 			return nil
 		}

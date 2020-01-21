@@ -20,6 +20,7 @@ type Config struct {
 	TimeoutEndResponse time.Duration `yaml:"timeout_end_response"`
 	MaxAttemptsRead    int           `yaml:"max_attempts_read"`
 	Pause              time.Duration `yaml:"pause"`
+	Rf                 float64       `yaml:"Rf" comment:"сопротивление обратной связи датчика, кОм"`
 }
 
 var (
@@ -30,6 +31,7 @@ var (
 		Chip:               "24W256",
 		TimeoutGetResponse: time.Second,
 		TimeoutEndResponse: 50 * time.Millisecond,
+		Rf:                 17.4,
 	}
 )
 

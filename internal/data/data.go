@@ -41,6 +41,7 @@ type Product struct {
 	ProductID int64     `db:"product_id" yaml:"product_id"`
 	PartyID   int64     `db:"party_id" yaml:"party_id"`
 	Place     int       `db:"place" yaml:"place"`
+	Active    bool      `db:"active" yaml:"active"`
 	dax.Product
 }
 
