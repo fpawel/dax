@@ -274,11 +274,15 @@ func setProductErr(x *prodsTblVmProduct, err error) {
 	mainWnd.Synchronize(prodsVm.PublishRowsReset)
 }
 
+func readSignal(ctx context.Context) ([]float64, error) {
+	return modbus.Read3Values(log, ctx, comportReader, config.Addr, 6, 10, modbus.BCD)
+}
+
 func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) *float64) error {
 
 	defer mainWnd.Synchronize(uploadLastParty)
 
-	xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 0, 10, modbus.BCD)
+	xs, err := readSignal(ctx)
 	if err == context.Canceled {
 		return nil
 	}
@@ -340,7 +344,7 @@ func writeFirmware(ctx context.Context) error {
 
 func interrogate(ctx context.Context) error {
 	for {
-		xs, err := modbus.Read3Values(log, ctx, comportReader, config.Addr, 6, 10, modbus.BCD)
+		xs, err := readSignal(ctx)
 		if merry.Is(err, context.Canceled) {
 			return nil
 		}
