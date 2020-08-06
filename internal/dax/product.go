@@ -40,8 +40,8 @@ func (p *Product) PutFirmwareBytes(b []byte) {
 		format := field.Tag.Get("flash_format")
 		switch format {
 		case "bcd":
-			n, ok := modbus.ParseBCD6(b[addr : addr+4])
-			if !ok {
+			n, err := modbus.ParseBCD6(b[addr : addr+4])
+			if err != nil {
 				n = math.NaN()
 			}
 			v.Field(i).SetFloat(n)

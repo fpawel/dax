@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/fpawel/comm"
-	"github.com/fpawel/comm/modbus"
 	"github.com/fpawel/dax/internal/dax"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 
 type Config struct {
 	Comport            string        `toml:"comport" comment:"СОМ порт, к которому подключен стенд"`
-	Addr               modbus.Addr   `toml:"addr" comment:"адрес MODBUS стенда"`
 	LogComm            bool          `yaml:"log_comm"`
 	Chip               string        `toml:"chip" comment:"тип микросхемы датчика ДАХ(0 – 24LC16|1 – 24LC64|2 – 24W256)"`
 	TimeoutGetResponse time.Duration `yaml:"timeout_get_response"`
@@ -26,7 +24,6 @@ type Config struct {
 var (
 	config = Config{
 		Comport:            "COM1",
-		Addr:               101,
 		LogComm:            false,
 		Chip:               "24W256",
 		TimeoutGetResponse: time.Second,

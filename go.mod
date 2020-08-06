@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/ansel1/merry v1.5.1
-	github.com/fpawel/comm v0.0.0-20191223111435-ed746751e6a5
+	github.com/fpawel/comm v0.0.0-20200710133946-abaf4b078976
 	github.com/fpawel/gohelp v0.0.0-20190924173037-13a662474c66
 	github.com/fpawel/gotools v0.0.0-20191030125146-1d6c7465834c
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
@@ -20,10 +20,10 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/powerman/check v1.2.1 // indirect
 	github.com/powerman/must v0.1.0
-	github.com/powerman/structlog v0.6.0
+	github.com/powerman/structlog v0.7.1
 	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae // indirect
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200121175148-a6ecf24a6d71
 )

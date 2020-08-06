@@ -96,10 +96,6 @@ func Main() {
 			ReadTimeout: time.Millisecond,
 			Name:        config.Comport,
 		})
-		if err := comPort.Open(); err != nil {
-			setStatusError(merry.Append(err, workName))
-			return
-		}
 
 		setStatusOk(fmt.Sprintf("%s: %s: выполняется", workName, config.Comport))
 		panicIf(pbRunInterrogate.SetText("Стоп"))
@@ -275,7 +271,18 @@ func setProductErr(x *prodsTblVmProduct, err error) {
 }
 
 func readSignal(ctx context.Context) ([]float64, error) {
-	return modbus.Read3Values(log, ctx, comportReader, config.Addr, 6, 10, modbus.BCD)
+	xs := make([]float64, 10)
+	for i := range xs {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		v, err := modbus.Read3Value(log, ctx, comportReader, 101+modbus.Addr(i), 208, modbus.FloatBigEndian)
+		if err != nil {
+			return nil, fmt.Errorf("блок %d: %w", i, err)
+		}
+		xs[i] = v
+	}
+	return xs, nil
 }
 
 func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) *float64) error {
@@ -290,6 +297,7 @@ func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) 
 		return err
 	}
 	for i := range prodsVm.xs {
+
 		x := &prodsVm.xs[i]
 
 		*f(x) = xs[i] * 1000. / config.Rf
@@ -303,10 +311,15 @@ func readParam(workName string, ctx context.Context, f func(*prodsTblVmProduct) 
 func readFirmware(ctx context.Context) error {
 	for i := range prodsVm.xs {
 
+		if !prodsVm.Checked(i) {
+			continue
+		}
+
 		x := &prodsVm.xs[i]
+
 		setProductOk(x, "считывание...")
 
-		b, err := dax.ReadFirmware(log, ctx, comportReader, config.Addr, i+1, parseChipType(config.Chip))
+		b, err := dax.ReadFirmware(log, ctx, comportReader, 101+modbus.Addr(i), 1, parseChipType(config.Chip))
 		if err == nil {
 			x.Product.PutFirmwareBytes(b)
 			setProductOk(x, "считано")
@@ -324,11 +337,15 @@ func readFirmware(ctx context.Context) error {
 func writeFirmware(ctx context.Context) error {
 	for i := range prodsVm.xs {
 
+		if !prodsVm.Checked(i) {
+			continue
+		}
+
 		x := &prodsVm.xs[i]
 
 		setProductOk(x, "запись...")
 
-		err := dax.WriteFirmware(log, ctx, comportReader, config.Addr, i+1, parseChipType(config.Chip), x.Product.ToFirmwareBytes())
+		err := dax.WriteFirmware(log, ctx, comportReader, 101+modbus.Addr(i), 1, parseChipType(config.Chip), x.Product.ToFirmwareBytes())
 		if err == nil {
 			setProductOk(x, "записано")
 			continue
